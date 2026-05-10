@@ -80,8 +80,10 @@ Do not highlight the background of lines with search hits. The search hits thems
 Hide the status bar, toggle with
 .B =
 .TP
-\fB\-\-quit\-if\-one\-screen\fR
-Print input contents without paging if the input fits on one screen.
+\fB\-\-quit\-if\-one\-screen\fR[={\fBscreen\fR | \fBwidth\fR | \fBheight\fR}]
+Print input contents without paging if it fits on one screen.
+Optionally accepts an axis: \fBscreen\fP (the default) requires both width and height to fit; \fBwidth\fP and \fBheight\fP each check only their dimension.
+The axis can also be passed as a space-separated argument: \fB--quit-if-one-screen height\fP.
 Affected by \fB--no-clear-on-exit-margin\fP.
 .TP
 \fB\-\-reformat\fR

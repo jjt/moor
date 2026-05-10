@@ -218,6 +218,8 @@ func TestReprintAfterExitFillsScreen(t *testing.T) {
 			pager.showLineNumbers = false
 			pager.WrapLongLines = wrapLongLines
 			pager.DeInitFalseMargin = 0
+			pager.QuitIfFitsWidth = true
+			pager.QuitIfFitsHeight = true
 
 			// Tell our Pager to quit immediately
 			pager.Quit()

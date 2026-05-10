@@ -104,7 +104,12 @@ type Pager struct {
 	WrapLongLines bool
 
 	// Ref: https://github.com/walles/moor/issues/113
-	QuitIfOneScreen bool
+	//
+	// Quit early if the input fits on one screen. Each dimension is checked
+	// independently — set both for the classic --quit-if-one-screen behavior,
+	// or just one to ignore the other axis.
+	QuitIfFitsWidth  bool
+	QuitIfFitsHeight bool
 
 	// Search for this string on startup, ignored if empty
 	InitialSearch string
@@ -695,7 +700,8 @@ func (p *Pager) StartPaging(screen twin.Screen, chromaStyle *chroma.Style, chrom
 				p.DeInit = false          // Makes ReprintAfterExit() be called on the way out
 				p.quit = true
 
-				log.Info("Exiting because of --quit-if-one-screen, everything fit on one screen and we're done")
+				log.Infof("Exiting early: input fit (width=%t height=%t), and we're done",
+					p.QuitIfFitsWidth, p.QuitIfFitsHeight)
 
 				// Exit the main loop
 				break
@@ -847,7 +853,7 @@ func (p *Pager) canQuitIfOneScreen(r *reader.ReaderImpl) bool {
 		return false
 	}
 
-	if !p.QuitIfOneScreen || p.isShowingHelp {
+	if (!p.QuitIfFitsWidth && !p.QuitIfFitsHeight) || p.isShowingHelp {
 		return false
 	}
 
@@ -859,14 +865,25 @@ func (p *Pager) canQuitIfOneScreen(r *reader.ReaderImpl) bool {
 	return p.fitsOnOneScreen()
 }
 
+// Returns true if the input fits on one screen given the configured
+// QuitIfFitsWidth / QuitIfFitsHeight flags. A disabled dimension is treated as
+// trivially fitting.
 func (p *Pager) fitsOnOneScreen() bool {
 	if len(p.readers) != 1 {
 		// At most one screen will fit on one screen...
 		return false
 	}
+	if !p.QuitIfFitsWidth && !p.QuitIfFitsHeight {
+		return false
+	}
 
 	if p.WrapLongLines {
-		return p.fitsOnOneScreenWrapped()
+		// With wrapping, lines never overflow horizontally — width fits by
+		// definition. Height fit accounts for wrapped rows.
+		if p.QuitIfFitsHeight {
+			return p.fitsOnOneScreenWrapped()
+		}
+		return true
 	}
 
 	width, height := p.screen.Size()
@@ -876,16 +893,17 @@ func (p *Pager) fitsOnOneScreen() bool {
 	reader := p.readers[0]
 	p.readerLock.Unlock()
 
-	if reader.GetLineCount() > height {
+	if p.QuitIfFitsHeight && reader.GetLineCount() > height {
 		return false
 	}
 
-	lines := reader.GetLines(linemetadata.Index{}, reader.GetLineCount())
-	for _, line := range lines.Lines {
-		rendered := line.HighlightedTokens(twin.StyleDefault, twin.StyleDefault, search.Search{}, width+1).StyledRunes
-		if len(rendered) > width {
-			// This line is too long to fit on one screen line, no fit
-			return false
+	if p.QuitIfFitsWidth {
+		lines := reader.GetLines(linemetadata.Index{}, reader.GetLineCount())
+		for _, line := range lines.Lines {
+			rendered := line.HighlightedTokens(twin.StyleDefault, twin.StyleDefault, search.Search{}, width+1).StyledRunes
+			if len(rendered) > width {
+				return false
+			}
 		}
 	}
 	return true

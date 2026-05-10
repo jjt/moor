@@ -136,7 +136,8 @@ func TestQuitIfOneScreenPaintsNothingWhileHighlighting(t *testing.T) {
 	screen := newCountingScreen(20, 10)
 
 	pager := NewPager(testReader)
-	pager.QuitIfOneScreen = true
+	pager.QuitIfFitsWidth = true
+	pager.QuitIfFitsHeight = true
 
 	pagingDone := startPagingInBackground(t, pager, screen)
 
@@ -169,7 +170,8 @@ func TestQuitIfOneScreenPaintsContentsThatDoNotFit(t *testing.T) {
 	screen := newCountingScreen(20, 10)
 
 	pager := NewPager(testReader)
-	pager.QuitIfOneScreen = true
+	pager.QuitIfFitsWidth = true
+	pager.QuitIfFitsHeight = true
 
 	pagingDone := startPagingInBackground(t, pager, screen)
 
@@ -193,7 +195,8 @@ func TestQuitIfOneScreenPaintsForAUserWhoAsks(t *testing.T) {
 	screen := newCountingScreen(20, 10)
 
 	pager := NewPager(testReader)
-	pager.QuitIfOneScreen = true
+	pager.QuitIfFitsWidth = true
+	pager.QuitIfFitsHeight = true
 
 	pagingDone := startPagingInBackground(t, pager, screen)
 

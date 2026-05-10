@@ -218,7 +218,8 @@ func pageFromReaderWithScreen(reader *internalReader.ReaderImpl, screen twin.Scr
 	pager := internal.NewPager(reader)
 	pager.WrapLongLines = options.WrapLongLines
 	pager.ShowLineNumbers = !options.NoLineNumbers
-	pager.QuitIfOneScreen = options.QuitIfOneScreen
+	pager.QuitIfFitsWidth = options.QuitIfOneScreen
+	pager.QuitIfFitsHeight = options.QuitIfOneScreen
 
 	style := internal.GetStyleForScreen(screen)
 	reader.SetStyleForHighlighting(style)

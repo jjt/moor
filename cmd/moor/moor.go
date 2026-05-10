@@ -219,6 +219,63 @@ func parseTabAmount(tabAmount string) (uint, error) {
 	return uint(value), nil
 }
 
+type quitIfOneScreenMode struct {
+	width, height bool
+}
+
+func parseQuitIfOneScreen(value string) (quitIfOneScreenMode, error) {
+	switch value {
+	case "screen":
+		return quitIfOneScreenMode{width: true, height: true}, nil
+	case "width":
+		return quitIfOneScreenMode{width: true}, nil
+	case "height":
+		return quitIfOneScreenMode{height: true}, nil
+	}
+	return quitIfOneScreenMode{}, fmt.Errorf("Valid --quit-if-one-screen values are screen, width and height")
+}
+
+// Strips --quit-if-one-screen[=value|" value"] forms from args and returns
+// the requested mode. Bare --quit-if-one-screen, or --quit-if-one-screen
+// followed by a non-axis arg (filename, another flag), means both axes
+// ("screen"). The non-axis arg is left in place for normal parsing.
+func extractQuitIfOneScreen(args []string) ([]string, quitIfOneScreenMode, error) {
+	out := make([]string, 0, len(args))
+	var mode quitIfOneScreenMode
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if arg == "--" {
+			out = append(out, args[i:]...)
+			break
+		}
+		if strings.HasPrefix(arg, "--quit-if-one-screen=") || strings.HasPrefix(arg, "-quit-if-one-screen=") {
+			value := arg[strings.IndexByte(arg, '=')+1:]
+			m, err := parseQuitIfOneScreen(value)
+			if err != nil {
+				return nil, quitIfOneScreenMode{}, err
+			}
+			mode = m
+			continue
+		}
+		if arg == "--quit-if-one-screen" || arg == "-quit-if-one-screen" {
+			next := ""
+			if i+1 < len(args) {
+				next = args[i+1]
+			}
+			if next == "screen" || next == "width" || next == "height" {
+				m, _ := parseQuitIfOneScreen(next)
+				mode = m
+				i++
+				continue
+			}
+			mode = quitIfOneScreenMode{width: true, height: true}
+			continue
+		}
+		out = append(out, arg)
+	}
+	return out, mode, nil
+}
+
 func parseMouseMode(mouseMode string) (twin.MouseMode, error) {
 	switch mouseMode {
 	case "auto":
@@ -396,7 +453,12 @@ func pagerFromArgs(
 	noStatusBar := flagSet.Bool("no-statusbar", false, "Hide the status bar, toggle with '='")
 	reFormat := flagSet.Bool("reformat", false, "Reformat some input files (JSON)")
 	flagSet.Bool("no-reformat", true, "No effect, kept for compatibility. See --reformat")
-	quitIfOneScreen := flagSet.Bool("quit-if-one-screen", false, "Don't page if contents fits on one screen. Affected by --no-clear-on-exit-margin.")
+	// Stub registration so the flag appears in --help. The actual value is
+	// parsed by extractQuitIfOneScreen before flag.Parse runs, since this flag
+	// accepts an optional axis argument (screen | width | height) that Go's
+	// stdlib flag package can't express directly.
+	flagSet.Bool("quit-if-one-screen", false,
+		"Don't page if input fits on one screen. Accepts an optional axis: screen (default), width or height. Affected by --no-clear-on-exit-margin.")
 	noClearOnExit := flagSet.Bool("no-clear-on-exit", false, "Retain screen contents when exiting moor")
 	noClearOnExitMargin := flagSet.Int("no-clear-on-exit-margin", 1,
 		"Number of lines to leave for your shell prompt, defaults to 1")
@@ -430,6 +492,14 @@ func pagerFromArgs(
 	}
 
 	targetLine, initialSearch, remainingArgs := parsePlusArgs(flags)
+	remainingArgs, quitIfOneScreen, err := extractQuitIfOneScreen(remainingArgs)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "ERROR:", "\x1b[1m"+err.Error()+"\x1b[m")
+		fmt.Fprintln(os.Stderr)
+		printCommandline(os.Stderr)
+		fmt.Fprintln(os.Stderr, "For help, run: \x1b[1mmoor --help\x1b[m")
+		os.Exit(1)
+	}
 
 	err = flagSet.Parse(remainingArgs)
 
@@ -608,7 +678,8 @@ func pagerFromArgs(
 	pager.ShowStatusBar = !*noStatusBar
 	pager.DeInit = !*noClearOnExit
 	pager.DeInitFalseMargin = *noClearOnExitMargin
-	pager.QuitIfOneScreen = *quitIfOneScreen
+	pager.QuitIfFitsWidth = quitIfOneScreen.width
+	pager.QuitIfFitsHeight = quitIfOneScreen.height
 	pager.StatusBarStyle = *statusBarStyle
 	pager.UnprintableStyle = *unprintableStyle
 	pager.WithTerminalFg = *terminalFg
